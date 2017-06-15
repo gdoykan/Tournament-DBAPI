@@ -72,12 +72,12 @@ def playerStandings():
     """
     conn = connect()
     c = conn.cursor()
-    c.execute("""select players.id, players.name
-              count(select matches.winner from matches where matches.winner = players.id) as win 
-              count(matches.winner) as games
-              from players left join matches on
-              players.id = matches.winner or players.id = matches.loser group by players.id;"""
-           )
+    c.execute("""select players.id, name, wins, sum(wins+wins)
+                from players
+                join matches
+                on players.id = matches.id
+                group by players.id, wins
+                order by wins desc;""")
     conn.commit()
     result = c.fetchall()
     conn.close()
@@ -93,6 +93,9 @@ def reportMatch(winner, loser):
     conn = connect()
     c = conn.cursor()
     c.execute("INSERT INTO matches (id, winner, loser) VALUES (DEFAULT, %s, %s);", ((winner,), (loser,)))
+    c.execute("""UPDATE players 
+                SET wins = wins + 1
+                WHERE id = %s;""", (winner,))
     conn.commit()
     conn.close()
 
@@ -112,5 +115,18 @@ def swissPairings():
         id2: the second player's unique id
         name2: the second player's name
     """
-
+    conn = connect()
+    cursor = conn.cursor()
+    cursor.execute("select * from players order by wins desc;")
+    result = cursor.fetchall()
+    l = []
+    i = 0
+    while len(result) > 0:
+        l.append((result[0][0], result[0][1]))
+        result.pop(0)
+        l[i] += (result[0][0], result[0][1])
+        result.pop(0)
+        i += 1
+    conn.close()
+    return l
 
